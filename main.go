@@ -1,64 +1,91 @@
 package main
 
 import (
-	"encoding/csv"
 	"fmt"
-	"log"
-	"os"
+	"net/http"
 
-	"github.com/gocolly/colly"
+	"golang.org/x/net/html"
 )
 
-func ScrapeLinks(link string) []string {
-	var hrefs []string
-	c := colly.NewCollector()
-	c.OnHTML(".mw-parser-output", func(e *colly.HTMLElement) {
-		hrefs = append(hrefs, e.ChildAttrs("a", "href")...)
-	})
-
-	c.Visit(link)
-	return hrefs
-}
-
-func CheckErr(err error) bool {
-	if err != nil {
-		log.Fatalf("Couldn't create file, err: %q", err)
-		return true
-	}
-	return false
-}
-
 func main() {
-	link := "https://en.wikipedia.org/wiki/Web_scraping"
+	resp, err := http.Get("https://kolesa.kz/cars/audi/")
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
 
-	fName := "Links.txt"
-	file, err := os.Create(fName)
+	doc, err := html.Parse(resp.Body)
+	if err != nil {
+		panic(err)
+	}
+	carLinks := extractCarLinks(doc)
 
-	if CheckErr(err) {
-		return
+	for _, link := range carLinks {
+		carResp, err := http.Get(link)
+		if err != nil {
+			continue
+		}
+		defer carResp.Body.Close()
+
+		carDoc, err := html.Parse(carResp.Body)
+		if err != nil {
+			continue
+		}
+		carDetails := extractCarDetails(carDoc)
+
+		// Do something with the car details
+		fmt.Println(carDetails)
 	}
 
-	defer file.Close()
-	writer := csv.NewWriter(file)
-	defer writer.Flush()
+	//Manually set the number of pages
 
-	writer.Write(ScrapeLinks(link))
+	for i := 2; i <= 351; i++ {
+		pageURL := fmt.Sprintf("https://kolesa.kz/cars/audi/?page=%d", i)
+		pageResp, err := http.Get(pageURL)
+		if err != nil {
+			continue
+		}
+		defer pageResp.Body.Close()
 
-	fName = "table.csv"
-	file, err = os.Create(fName)
+		// Extract car URLs from page and repeat Step 3
+		pageDoc, err := html.Parse(pageResp.Body)
+		if err != nil {
+			continue
+		}
+		carLinks := extractCarLinks(pageDoc)
+		for _, link := range carLinks {
+			// Repeat Step 3
+		}
+	}
+}
 
-	c := colly.NewCollector()
+// Helper functions to extract car URLs and details using HTML parsing
+func extractCarLinks(doc *html.Node) []string {
+	// Implement logic to extract car links from HTML document
+	return nil
+}
 
-	c.OnHTML("table#customers", func(e *colly.HTMLElement) {
-		e.ForEach("tr", func(_ int, el *colly.HTMLElement) {
-			writer.Write([]string{
-				el.ChildText("td:nth-child(1)"),
-				el.ChildText("td:nth-child(2)"),
-				el.ChildText("td:nth-child(3)"),
-			})
-		})
-		fmt.Println("Scrapping Complete")
-	})
+func extractCarDetails(doc *html.Node) map[string]string {
+	// Implement logic to extract car details from HTML document
+	return nil
+}
 
-	c.Visit("https://www.w3schools.com/html/html_tables.asp")
+func step3(carLinks []string) {
+
+	for _, link := range carLinks {
+		carResp, err := http.Get(link)
+		if err != nil {
+			continue
+		}
+		defer carResp.Body.Close()
+
+		carDoc, err := html.Parse(carResp.Body)
+		if err != nil {
+			continue
+		}
+		carDetails := extractCarDetails(carDoc)
+
+		// Do something with the car details
+		fmt.Println(carDetails)
+	}
 }
